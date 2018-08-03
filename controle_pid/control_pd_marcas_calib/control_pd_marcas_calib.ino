@@ -2,14 +2,14 @@
 
 //pwm 
 #define PWMMIN 50
-#define PWMMAX 210
+#define PWMMAX 80
 #define Kp 300.0// var angular de 0 - 2123
 #define Kd 10.0
 #define Ki 2.0
 
 
-//Maina
-bool debugSen = false;
+//Degug
+bool debugSen = false;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               ;
 bool debugMotor = false;
 bool debugMark = false;
 
@@ -27,13 +27,13 @@ Motors M;
 AF_DCMotor motorEsq(1, MOTOR12_64KHZ);
 AF_DCMotor motorDir(2, MOTOR12_64KHZ);
 
-//--------------------------------Dimensões do robô
-//dimensões do robô
+//--------------------------------DimensÃµes do robÃ´
+//dimensÃµes do robo
 #define COMP 0.1316
 #define EIXO 0.1379
 #define RAIO 0.0313
 
-//--------------------------------Distâncias dos sensores
+//--------------------------------DistÃ¢ncias dos sensores
 //Peso dos sensores
 #define DS1 -0.03375
 #define DS2 -0.024
@@ -56,20 +56,76 @@ AF_DCMotor motorDir(2, MOTOR12_64KHZ);
 #define S8PIN A15
 
 //Pino para marcas
-//#define SMARKDIR A7
+#define SMARKDIR A7
 
 //pino para curvas
-//#define SMARCKESQ A0
+#define SMARKESQ A0
 
 //--------------------------------Leitura dos sensores
-//valor máximo de leitura do sensor /10
+//valor mÃ¡ximo de leitura do sensor /10
 #define READMAX 1024
 unsigned int sensRead[8];
-unsigned int sensMarkDir,sensCurve;
+unsigned int sensMarkDir,sensMarkEsq,sensCurve;
+double MARKC;
+double THRESHMARK = 350;
 
-//-------------Novas funçoes para o CORA ---------------------
-//Scurve
-void curvafechada(){
+//-------------Novas funÃ§oes para o CORA ---------------------
+long tstart;
+bool emcurva;
+bool trocaestado;
+
+void curvafechadaDir(){
+ // Serial.print ("LE ");
+  //Serial.print (sensRead[1]);
+  if (sensRead[0]<THRESHMARK){
+
+      /* Serial.print(" ");
+       Serial.print (tstart);
+       Serial.print (" Inicio");
+       Serial.print (sensRead[1]);
+       Serial.print ("\n");*/
+       motorDir.setSpeed(100);
+       motorEsq.setSpeed(100); 
+       motorDir.run(BACKWARD);
+       motorEsq.run(FORWARD);
+  }else{
+       emcurva=false;
+     /*  Serial.print ("Parei");
+       Serial.print (sensRead[1]);
+       Serial.print ("\n");*/
+       motorDir.setSpeed(0);
+       motorEsq.setSpeed(0); 
+       motorDir.run(FORWARD);
+       motorEsq.run(FORWARD);
+     
+   //emcurva=false; 
+  }
+  
+}
+void curvafechadaEsq(){
+   if (sensRead[7]<THRESHMARK){
+
+      /* Serial.print(" ");
+       Serial.print (tstart);
+       Serial.print (" Inicio");
+       Serial.print (sensRead[1]);
+       Serial.print ("\n");*/
+       motorEsq.setSpeed(100);
+       motorDir.setSpeed(100); 
+       motorEsq.run(BACKWARD);
+       motorDir.run(FORWARD);
+  }else{
+       emcurva=false;
+     /*  Serial.print ("Parei");
+       Serial.print (sensRead[1]);
+       Serial.print ("\n");*/
+       motorDir.setSpeed(0);
+       motorEsq.setSpeed(0); 
+       motorDir.run(FORWARD);
+       motorEsq.run(FORWARD);
+     
+   //emcurva=false; 
+  }
 }
 void seguindolinha(){
         motorEsq.setSpeed(constrain(PWMMIN + abs(M.pwmL), PWMMIN, PWMMAX));
@@ -90,60 +146,89 @@ void seguindolinha(){
           motorDir.run(FORWARD);
         }
 }
-#define TBMARKS 300
-#define TBMARKSBIT 100
-//controle de tempo entre marcas
-unsigned long tmark;
+#define TBMARKS 300 //Tempo indicando que saiu da regiao de marcas 
+#define TDirEsq 10 //Tempo maximo entre a leitura do lado esquerdo e direito
+
+int state;
+
+
 //Conta as marcas diretas
 int contDir;
 //Conta as marcas esquerdas
 int contEsq;
+unsigned long tmarkDir, tmarkEsq;//Tempo da ultima leitura de linha do lado esquerdo e direito, usado pra sincronizar as duas leituras
+unsigned long tmark1,tmark2;
+int novamarca;
+boolean lendomarca;
 
-int state;
-
-void MEstadosMotor(){
-  int novamarca;
-  //Conta as marcas laterais 
-  if((tmark == INF)){
-    if(debugMark){
-      Serial.print(state); Serial.print(" ");
-      Serial.print(sensMarkDir); Serial.print(" ");
-      Serial.println(THRESHMARK);
+void tomadordedecisao(){
+  unsigned long wait; //Conta o tempo a partir que um marca foi contada
+ // contamarcasDir();
+  if(tmarkDir!=INF || tmarkEsq != INF){
+    wait=millis();
+    if((millis()-wait)<=TDirEsq){
+        if(tmarkDir!=INF && tmarkEsq != INF){//Se as duas marcas foram lidas 
+         //Vira para o lado pre definido
+       }
     }
-    if (sensMarkDir >= THRESHMARK) {
-          tmark = millis();
-          
-    }
-  }else if(tmark != INF){
-
-    //Diferencia se  uma marca de curva ou linha simples
-    if ((millis() - tmark) >= TBMARKSBIT && (millis() - tmark) <= TBMARKS) { 
-      if (sensMarkDir >= THRESHMARK && novamarca == false) { //Ainda esta lendo branco, adiciona 1 na contagem de marcas
-          contDir++;
-          novamarca=true;
-      }
-      
-            
-     
-    }else if ( (millis() - tmark) >= TBMARKS){ 
-      tmark=INF;
-    }
+    else{ //Se marca for so de um lado 
+        if(contDir==1) curvafechadaDir();
+        else if(contEsq==1) curvafechadaEsq();
+  //    else if(contDir>1)rotatoria(contDir);
+      tmarkDir=tmarkEsq=INF;
+    }    
   }
-  //Saber se encerrou a contagem
   
-  
-  switch(state) {
-       switch(state){ 
-       case 1:
-        seguindolinha();
-        break; 
-       case 2:
-        curvafechada();
-        break;
-      } 
 }
 
+boolean test;//1 - esperando marca, 
+void novocontamarcaDir(){
+   
+  //Rotina padrao enquanto nao indentificou nenhum marca branca
+  if(tmark1 == INF){
+    if(debugMark){
+      Serial.print("Dir: "); 
+      Serial.print(sensMarkDir); Serial.print(" ");
+      
+    }
+
+    if (sensMarkDir >= THRESHMARK) {
+          tmark1 = millis();
+          lendomarca=false;
+          test=false;
+          Serial.print ("Alguma coisa ");
+    }
+  }else if(tmark1 != INF){
+    if(test==false){
+      test=true;
+      Serial.print ("\n Senso1 ");
+      Serial.print (sensRead[1] );
+      Serial.print (" Senso7 ");
+      Serial.print (sensRead[6]);
+      if( sensRead[1] < THRESHMARK && sensRead[6] < THRESHMARK ){//Logo apos ter indetificado o branco
+                 contDir++;
+                 Serial.print("Le marca\n"); 
+      }else{      
+          Serial.print ("LE linha\n\n"); 
+          tomadordedecisao();
+          contDir=0; 
+      }
+         
+    }
+    
+    if ((millis() - tmark1) >= TBMARKS && sensMarkDir<THRESHMARK && sensMarkEsq<THRESHMARK) {
+      tmark1 = INF;
+    }
+  }  
+}
+
+
+
+
+
+
 void readSens(){
+  
   sensRead[0]=READMAX-analogRead(S1PIN);
   sensRead[1]=READMAX-analogRead(S2PIN);
   sensRead[2]=READMAX-analogRead(S3PIN);
@@ -153,7 +238,7 @@ void readSens(){
   sensRead[6]=READMAX-analogRead(S7PIN);
   sensRead[7]=READMAX-analogRead(S8PIN);
   sensMarkDir=READMAX-analogRead(SMARKDIR);
-  sensCurve=READMAX-analogRead(SCURVE);
+  sensMarkEsq=READMAX-analogRead(SMARKESQ);
   
   if(debugSen){
     Serial.print(" "); Serial.print(sensRead[0]);
@@ -164,16 +249,17 @@ void readSens(){
     Serial.print(" "); Serial.print(sensRead[5]);
     Serial.print(" "); Serial.print(sensRead[6]);
     Serial.print(" "); Serial.print(sensRead[7]);
+    Serial.print(" Dir "); Serial.print(sensMarkDir);
+    Serial.print(" Esq "); Serial.print(sensMarkEsq);  
   }
 
 }
 
-//--------------------------------Rotina de calibração dos sensores
+//--------------------------------Rotina de calibraÃ§Ã£o dos sensores
 //valor de corte das marcas
 //#define MARKC 10
 //#define THRE6
-double MARKC;
-double THRESHMARK = 200;
+
 
 void calibrate(){
   int i,j;
@@ -221,14 +307,14 @@ void centroid(){
   //err = sumW / (sum/8);
 }
 
-//--------------------------------Detecção de marcas
+//--------------------------------DetecÃ§Ã£o de marcas
 //tempo entre marcas
 //#define TBMARKS 300
 //controle de tempo entre marcas
 //unsigned long tmark;
 //estado
 
-
+/*
 void detectaMarcas(){
   if((tmark == INF)){
     if(debugMark){
@@ -256,12 +342,12 @@ void detectaMarcas(){
       tmark = INF;
     }
   }
-}
+}*/
 
 //--------------------------------Control
 
 
-//velocidade angular máxima
+//velocidade angular mÃ¡xima
 //#define Wmax 21.2622
 #define Wmax 6.0
 
@@ -299,8 +385,10 @@ void control() {
 
 int STATESM;
 
+
 void setup() {
-   
+  pinMode(SMARKDIR, INPUT);
+  pinMode(SMARKESQ, INPUT);
   motorEsq.setSpeed(0);
   motorDir.setSpeed(0);
   motorEsq.run(RELEASE);
@@ -308,25 +396,35 @@ void setup() {
   Serial.begin(9600);
   state=0;
   STATESM=0; 
-  tmark=INF;
+  tmark1=tmark2=INF;
   lt = var = millis();
-  contDir=0;
-  contEsq=0;
+  contDir=contEsq=0;
+  tmarkDir=tmarkEsq=INF;
+ 
+
+
+
+  //Teste rotação 
+
+   tstart=millis(); 
+   emcurva=true;
+ 
 }
 
 
 void loop() {
+  readSens();
+  novocontamarcaDir();
+
+  /*
   if ((millis() - lt) >  T ) {
     lt = millis();
 
-    //if (millis() - var > 1000 * 10){
-     // motorDir.setSpeed(0);
-     //motorEsq.setSpeed(0);
-    //}else{
+
     centroid();
     //detectaMarcas();
     control();
-    MEstadoMotor();
+   // MEstadoMotor();
 
     
     err_ante = err;
@@ -334,7 +432,7 @@ void loop() {
     if(debugSen || debugMotor){
      Serial.print("\terr: "); Serial.print(err, 4);
     }
-    
+    */
     if(debugMotor){
       Serial.print("\t Wl: "); Serial.print(Wl);
       Serial.print(" Wr: "); Serial.print(Wr);
@@ -350,6 +448,6 @@ void loop() {
       Serial.println(" ");
     }
 
-    }
+    //}
   
 }
