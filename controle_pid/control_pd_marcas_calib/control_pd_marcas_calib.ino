@@ -1,12 +1,12 @@
 #include <AFMotor.h> // https://learn.adafruit.com/adafruit-motor-shield/library-install
 
 //pwm 
-#define PWMMIN 50
-#define PWMMAX 100
-#define Kp 300.0// var angular de 0 - 2123
-#define Kd 10.0
-#define Ki 2.0
-double THRESHMARK = 200;
+#define PWMMIN  0  //50
+#define PWMMAX 70  //150
+#define Kp 250.0// var angular de 0 - 2123
+#define Kd 30.0
+#define Ki 1.0
+double THRESHMARK = 150;
 
 //Maina
 bool debugSen = false;
@@ -29,9 +29,9 @@ AF_DCMotor motorDir(4, MOTOR12_64KHZ);
 
 //--------------------------------Dimensões do robô
 //dimensões do robô
-#define COMP 0.1316
-#define EIXO 0.1379
-#define RAIO 0.0313
+#define COMP 0.1316 //1316
+#define EIXO 0.1000 //1379
+#define RAIO 0.0213 //0.0333
 
 //--------------------------------Distâncias dos sensores
 //Peso dos sensores
@@ -59,7 +59,7 @@ AF_DCMotor motorDir(4, MOTOR12_64KHZ);
 #define SMARK A7
 
 //pino para curvas
-#define SCURVE A0
+
 
 //--------------------------------Leitura dos sensores
 //valor máximo de leitura do sensor /10
