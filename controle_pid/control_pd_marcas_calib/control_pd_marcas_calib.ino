@@ -4,8 +4,8 @@
 #define PWMMIN  0  //50
 #define PWMMAX 70  //150
 #define Kp 250.0// var angular de 0 - 2123
-#define Kd 30.0
-#define Ki 1.0
+#define Kd 35.0
+#define Ki 2.0
 double THRESHMARK = 150;
 
 //Maina
@@ -68,6 +68,7 @@ unsigned int sensRead[8];
 unsigned int sensMark,sensCurve;
 
 void readSens(){
+  
   sensRead[0]=READMAX-analogRead(S1PIN);
   sensRead[1]=READMAX-analogRead(S2PIN);
   sensRead[2]=READMAX-analogRead(S3PIN);
