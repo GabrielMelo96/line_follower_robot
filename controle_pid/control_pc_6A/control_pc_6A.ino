@@ -1,13 +1,13 @@
 #include <AFMotor.h> // https://learn.adafruit.com/adafruit-motor-shield/library-install
 #include <QTRSensors.h>
 
-
-#define NUM_SENSORS             8  // number of sensors used
+  
+#define NUM_SENSORS             6  // number of sensors used
 #define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
 #define EMITTER_PIN             2  // emitter is controlled by digital pin 2
 
 // sensors 0 through 5 are connected to analog inputs 0 through 5, respectively
-QTRSensorsAnalog QTRA((unsigned char[]) {8,9,10,11,12,13,14,15},
+QTRSensorsAnalog QTRA((unsigned char[]) {8,9,10,11,12,13},
   NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
 unsigned int sensorValues[NUM_SENSORS];
  
@@ -15,13 +15,13 @@ unsigned int sensorValues[NUM_SENSORS];
 #define PWMMIN  0  //50
 #define PWMMAX 140  //150
 #define Kp 200.0// var angular de 0 - 2123
-#define Kd 15.0
-#define Ki 2.0
+#define Kd 20.0
+#define Ki 0.0
 double Reduction=0.5;
-double THRESHMARK = 150;
-
+double THRESHMARK = 500;
+ 
 //Maina
-bool debugSen = true;
+bool debugSen = false;
 bool debugMotor = false;
 bool debugMark = false;
 
@@ -36,8 +36,8 @@ typedef struct MotorsS {
 
 Motors M;
 
-AF_DCMotor motorEsq(3, MOTOR12_64KHZ);
-AF_DCMotor motorDir(4, MOTOR12_64KHZ);
+AF_DCMotor motorEsq(4, MOTOR12_64KHZ);
+AF_DCMotor motorDir(3, MOTOR12_64KHZ);
 
 //--------------------------------Dimensões do robô
 //dimensões do robô
@@ -47,14 +47,14 @@ AF_DCMotor motorDir(4, MOTOR12_64KHZ);
 
 //--------------------------------Distâncias dos sensores
 //Peso dos sensores
-#define DS1 -0.03375
-#define DS2 -0.024
-#define DS3 -0.0145
-#define DS4 -0.0045
-#define DS5 0.0045
-#define DS6 0.0145
-#define DS7 0.024
-#define DS8 0.03375
+//#define DS1 -0.03375
+#define DS1 -0.024
+#define DS2 -0.0145
+#define DS3 -0.0045
+#define DS4 0.0045
+#define DS5 0.0145
+#define DS6 0.024
+//#define DS8 0.03375
 
 //--------------------------------Pinos dos Sensores
 //Pinos dos sensores da centroid
@@ -64,8 +64,8 @@ AF_DCMotor motorDir(4, MOTOR12_64KHZ);
 #define S4PIN A11
 #define S5PIN A12
 #define S6PIN A13
-#define S7PIN A14
-#define S8PIN A15
+//#define S7PIN A14
+//#define S8PIN A15
 
 //Pino para marcas
 #define SMARK A7
@@ -76,20 +76,35 @@ AF_DCMotor motorDir(4, MOTOR12_64KHZ);
 //--------------------------------Leitura dos sensores
 //valor máximo de leitura do sensor /10
 #define READMAX 1024
-unsigned int sensRead[8];
+#define CUTMARK 500
+unsigned int sensRead[6];
+unsigned int oldsensRead[6];
 unsigned int sensMark,sensCurve;
+int j;
 
 void readSens(){
   unsigned int position = QTRA.readLine(sensorValues);
+   
+  for (j=0;j<6;j++){
+          oldsensRead[j]=sensRead[j];
+  }
   sensRead[0]=READMAX-sensorValues[0];
   sensRead[1]=READMAX-sensorValues[1];
   sensRead[2]=READMAX-sensorValues[2];
   sensRead[3]=READMAX-sensorValues[3];
   sensRead[4]=READMAX-sensorValues[4];
   sensRead[5]=READMAX-sensorValues[5];
-  sensRead[6]=READMAX-sensorValues[6];
-  sensRead[7]=READMAX-sensorValues[7];
+  
   sensMark=READMAX-analogRead(SMARK);
+
+  if(sensRead[0]<CUTMARK && sensRead[1]<CUTMARK && sensRead[2]<CUTMARK && sensRead[3]<CUTMARK &&
+      sensRead[4]<CUTMARK && sensRead[5]<CUTMARK ){
+        for (j=0;j<6;j++){
+          sensRead[j]=oldsensRead[j];
+        }
+        
+      }
+  
 /*
   sensRead[0]=READMAX-analogRead(S1PIN);
   sensRead[1]=READMAX-analogRead(S2PIN);
@@ -97,8 +112,8 @@ void readSens(){
   sensRead[3]=READMAX-analogRead(S4PIN);
   sensRead[4]=READMAX-analogRead(S5PIN);
   sensRead[5]=READMAX-analogRead(S6PIN);
-  sensRead[6]=READMAX-analogRead(S7PIN);
-//  sensRead[7]=READMAX-analogRead(S8PIN);
+  
+// 
   sensMark=READMAX-analogRead(SMARK);
   */
   if(debugSen){
@@ -108,8 +123,6 @@ void readSens(){
     Serial.print(" "); Serial.print(sensRead[3]);
     Serial.print(" "); Serial.print(sensRead[4]);
     Serial.print(" "); Serial.print(sensRead[5]);
-    Serial.print(" "); Serial.print(sensRead[6]);
-    Serial.print(" "); Serial.print(sensRead[7]);
     Serial.print("   Mark:"); Serial.print(sensMark);
   }
 
@@ -124,7 +137,7 @@ double MARKC;
 
 
 //--------------------------------Calculo da centroid
-double WSens[8] = {DS1, DS2, DS3, DS4, DS5, DS6, DS7, DS8};
+double WSens[6] = {DS1, DS2, DS3, DS4, DS5, DS6};
 double err;
 
 void centroid(){
@@ -133,7 +146,7 @@ void centroid(){
 
   readSens();
 
-  for (i = 0; i < 7; i++) {
+  for (i = 0; i < 6; i++) {
     sumW += (double)sensRead[i] * WSens[i];
     sum += (double)sensRead[i];
   }
@@ -153,13 +166,13 @@ int state;
 void detectaMarcas(){
   if((tmark == INF)){
     if(debugMark){
-      Serial.print(state); Serial.print(" ");
+      Serial.print(state); 
       Serial.print(sensMark); Serial.print(" ");
       Serial.println(THRESHMARK);
     }
     switch(state) {
-      case 3:
-        delay(500);
+      case 4:
+        delay(200);
         motorEsq.setSpeed(0);
         motorDir.setSpeed(0);
         motorEsq.run(RELEASE);
@@ -187,7 +200,7 @@ void detectaMarcas(){
 #define Wmax 6.0
 
 //tempo de amostragem
-#define T 4  //
+#define T 2  //
 
 double Wk;
 double Vk;
@@ -219,6 +232,7 @@ void control() {
 
 
 void setup() {
+  sensRead[0]=0;sensRead[1]=0;sensRead[2]=700;sensRead[3]=700;sensRead[4]=0;sensRead[5]=0;
   for (int i = 0; i < 200; i++)  // make the calibration take about 10 seconds
   {
     QTRA.calibrate();       // reads all sensors 10 times at 2.5 ms per six sensors (i.e. ~25 ms per call)
@@ -247,6 +261,7 @@ void loop() {
     //}else{
     centroid();
     //detectaMarcas();
+    detectaMarcas();
     control();
     
     motorEsq.setSpeed(constrain(PWMMIN + abs(M.pwmL), PWMMIN, PWMMAX));
